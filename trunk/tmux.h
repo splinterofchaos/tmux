@@ -842,6 +842,13 @@ struct window_mode {
 	void	(*timer)(struct window_pane *);
 };
 
+struct window_choose_data {
+	struct client	*client;
+	struct session	*session;
+	char		*raw_format;
+	char		*template;
+};
+
 /* Child window structure. */
 struct window_pane {
 	u_int		 id;
@@ -2119,6 +2126,7 @@ void printflike3 window_choose_add(
 		     struct window_pane *, int, const char *, ...);
 void		 window_choose_ready(struct window_pane *,
 		     u_int, void (*)(void *, int), void (*)(void *), void *);
+void		 window_choose_ctx(struct window_choose_data *);
 
 /* names.c */
 void		 queue_window_name(struct window *);
