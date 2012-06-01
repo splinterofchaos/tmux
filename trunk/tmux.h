@@ -848,7 +848,7 @@ struct window_choose_data {
 	struct client		*client;
 	struct session		*session;
 	struct format_tree	*ft;
-	const char		*ft_template;
+	char			*ft_template;
 	char			*raw_format;
 	char			*action;
 	u_int			 idx;
@@ -2135,7 +2135,7 @@ void		 window_choose_vadd(
 void		 window_choose_add(struct window_pane *,
 			 struct window_choose_data *);
 void		 window_choose_ready(struct window_pane *,
-		     u_int, void (*)(void *, int), void (*)(void *), void *);
+		     u_int, void (*)(void *), void (*)(void *));
 void		 window_choose_ctx(struct window_choose_data *);
 
 /* names.c */

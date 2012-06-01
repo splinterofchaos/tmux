@@ -31,7 +31,7 @@ void	window_choose_key(struct window_pane *, struct session *, int);
 void	window_choose_mouse(
 	    struct window_pane *, struct session *, struct mouse_event *);
 
-void	window_choose_fire_callback(struct window_pane *, int);
+void	window_choose_fire_callback(struct window_pane *, void *);
 void	window_choose_redraw_screen(struct window_pane *);
 void	window_choose_write_line(
 	    struct window_pane *, struct screen_write_ctx *, u_int);
@@ -53,23 +53,16 @@ struct window_choose_mode_data {
 
 	struct mode_key_data	mdata;
 
-	ARRAY_DECL(, struct window_choose_item) list;
+	ARRAY_DECL(, struct window_choose_mode_item) list;
 	u_int			top;
 	u_int			selected;
 
-	void 			(*callbackfn)(void *, int);
+	void 			(*callbackfn)(void *);
 	void			(*freefn)(void *);
 };
 
 int	window_choose_key_index(struct window_choose_mode_data *, u_int);
 int	window_choose_index_key(struct window_choose_mode_data *, int);
-
-void
-window_choose_vadd(struct window_pane *wp, int idx, const char *fmt, va_list ap)
-{
-	xvasprintf(&item->name, fmt, ap);
-	item->idx = idx;
-}
 
 void
 window_choose_add(struct window_pane *wp, struct window_choose_data *wcd)
@@ -80,13 +73,13 @@ window_choose_add(struct window_pane *wp, struct window_choose_data *wcd)
 	ARRAY_EXPAND(&data->list, 1);
 	item = &ARRAY_LAST(&data->list);
 
-	item->name = format_expand(data->ft, data->ft_template);
+	item->name = format_expand(wcd->ft, wcd->ft_template);
 	item->wcd = wcd;
 }
 
 void
 window_choose_ready(struct window_pane *wp, u_int cur,
-    void (*callbackfn)(void *, int), void (*freefn)(void *), void *cdata)
+    void (*callbackfn)(void *), void (*freefn)(void *))
 {
 	struct window_choose_mode_data	*data = wp->modedata;
 	struct screen			*s = &data->screen;
@@ -97,7 +90,6 @@ window_choose_ready(struct window_pane *wp, u_int cur,
 
 	data->callbackfn = callbackfn;
 	data->freefn = freefn;
-	data->data = cdata;
 
 	window_choose_redraw_screen(wp);
 }
@@ -113,7 +105,6 @@ window_choose_init(struct window_pane *wp)
 
 	data->callbackfn = NULL;
 	data->freefn = NULL;
-	data->data = NULL;
 
 	ARRAY_INIT(&data->list);
 	data->top = 0;
@@ -137,13 +128,15 @@ void
 window_choose_free(struct window_pane *wp)
 {
 	struct window_choose_mode_data	*data = wp->modedata;
+	struct window_choose_mode_item	*item;
 	u_int				 i;
 
-	if (data->freefn != NULL && data->data != NULL)
-		data->freefn(data->data);
-
-	for (i = 0; i < ARRAY_LENGTH(&data->list); i++)
-		xfree(ARRAY_ITEM(&data->list, i).name);
+	for (i = 0; i < ARRAY_LENGTH(&data->list); i++) {
+		item = &ARRAY_ITEM(&data->list, i);
+		if (data->freefn != NULL && item->wcd != NULL)
+			data->freefn(item->wcd);
+		xfree(item->name);
+	}
 	ARRAY_FREE(&data->list);
 
 	screen_free(&data->screen);
@@ -165,7 +158,7 @@ window_choose_resize(struct window_pane *wp, u_int sx, u_int sy)
 }
 
 void
-window_choose_fire_callback(struct window_pane *wp, int idx)
+window_choose_fire_callback(struct window_pane *wp, void *wcd)
 {
 	struct window_choose_mode_data	*data = wp->modedata;
 	const struct window_mode	*oldmode;
@@ -173,7 +166,7 @@ window_choose_fire_callback(struct window_pane *wp, int idx)
 	oldmode = wp->mode;
 	wp->mode = NULL;
 
-	data->callbackfn(data->data, idx);
+	data->callbackfn(wcd);
 
 	wp->mode = oldmode;
 }
@@ -193,12 +186,12 @@ window_choose_key(struct window_pane *wp, unused struct session *sess, int key)
 
 	switch (mode_key_lookup(&data->mdata, key)) {
 	case MODEKEYCHOICE_CANCEL:
-		window_choose_fire_callback(wp, -1);
+		window_choose_fire_callback(wp, NULL);
 		window_pane_reset_mode(wp);
 		break;
 	case MODEKEYCHOICE_CHOOSE:
 		item = &ARRAY_ITEM(&data->list, data->selected);
-		window_choose_fire_callback(wp, item->idx);
+		window_choose_fire_callback(wp, item);
 		window_pane_reset_mode(wp);
 		break;
 	case MODEKEYCHOICE_UP:
@@ -304,7 +297,7 @@ window_choose_key(struct window_pane *wp, unused struct session *sess, int key)
 		data->selected = idx;
 
 		item = &ARRAY_ITEM(&data->list, data->selected);
-		window_choose_fire_callback(wp, item->idx);
+		window_choose_fire_callback(wp, item);
 		window_pane_reset_mode(wp);
 		break;
 	}
@@ -333,7 +326,7 @@ window_choose_mouse(
 	data->selected = idx;
 
 	item = &ARRAY_ITEM(&data->list, data->selected);
-	window_choose_fire_callback(wp, item->idx);
+	window_choose_fire_callback(wp, item);
 	window_pane_reset_mode(wp);
 }
 
@@ -472,7 +465,8 @@ window_choose_ctx(struct window_choose_data *cdata)
 	struct cmd_list		*cmdlist;
 	char			*template, *cause;
 
-	template = cmd_template_replace(cdata->template, cdata->raw_format, 1);
+	template = cmd_template_replace(cdata->ft_template,
+			cdata->raw_format, 1);
 
 	if (cmd_string_parse(template, &cmdlist, &cause) != 0) {
 		if (cause != NULL) {

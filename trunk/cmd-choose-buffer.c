@@ -28,7 +28,7 @@
 
 int	cmd_choose_buffer_exec(struct cmd *, struct cmd_ctx *);
 
-void	cmd_choose_buffer_callback(void *, int);
+void	cmd_choose_buffer_callback(void *);
 void	cmd_choose_buffer_free(void *);
 
 const struct cmd_entry cmd_choose_buffer_entry = {
@@ -80,8 +80,8 @@ cmd_choose_buffer_exec(struct cmd *self, struct cmd_ctx *ctx)
 
 		cdata->ft_template = xstrdup(template);
 		cdata->idx = idx - 1;
+		cdata->ft = ft;
 		cdata->client = ctx->curclient;
-		cdata->client->references++;
 
 		format_add(ft, "line", "%u", idx - 1);
 		format_paste_buffer(ft, pb);
@@ -91,18 +91,21 @@ cmd_choose_buffer_exec(struct cmd *self, struct cmd_ctx *ctx)
 		format_free(ft);
 	}
 
+	cdata->client->references++;
+
 	window_choose_ready(wl->window->active,
-	    0, cmd_choose_buffer_callback, cmd_choose_buffer_free, cdata);
+	    0, cmd_choose_buffer_callback, cmd_choose_buffer_free);
 
 	return (0);
 }
 
 void
-cmd_choose_buffer_callback(void *data, int idx)
+cmd_choose_buffer_callback(void *data)
 {
 	struct window_choose_data	*cdata = data;
+	u_int				 idx = cdata->idx;
 
-	if (idx == -1)
+	if (data == NULL)
 		return;
 	if (cdata->client->flags & CLIENT_DEAD)
 		return;
@@ -119,7 +122,7 @@ cmd_choose_buffer_free(void *data)
 	cdata->client->references--;
 
 	/* TA:  FIXME - move this to window_choose_free() or somesuch. */
-	xfree(cdata->ft_template);
+	xfree((char *)cdata->ft_template);
 	xfree(cdata->action);
 	xfree(cdata->raw_format);
 	xfree(cdata);
