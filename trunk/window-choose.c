@@ -124,6 +124,23 @@ window_choose_init(struct window_pane *wp)
 	return (s);
 }
 
+struct window_choose_data *
+window_choose_data_create(struct cmd_ctx *ctx)
+{
+	struct window_choose_data	*wcd;
+
+	wcd = xmalloc(sizeof *wcd);
+	wcd->ft = format_create();
+	wcd->ft_template = xstrdup("");
+	wcd->action = NULL;
+	wcd->raw_format = NULL;
+	wcd->client = ctx->curclient;
+	wcd->session = ctx->curclient->session;
+	wcd->idx = -1;
+
+	return (wcd);
+}
+
 void
 window_choose_free(struct window_pane *wp)
 {
@@ -191,7 +208,7 @@ window_choose_key(struct window_pane *wp, unused struct session *sess, int key)
 		break;
 	case MODEKEYCHOICE_CHOOSE:
 		item = &ARRAY_ITEM(&data->list, data->selected);
-		window_choose_fire_callback(wp, item);
+		window_choose_fire_callback(wp, item->wcd);
 		window_pane_reset_mode(wp);
 		break;
 	case MODEKEYCHOICE_UP:
@@ -465,7 +482,7 @@ window_choose_ctx(struct window_choose_data *cdata)
 	struct cmd_list		*cmdlist;
 	char			*template, *cause;
 
-	template = cmd_template_replace(cdata->ft_template,
+	template = cmd_template_replace(cdata->action,
 			cdata->raw_format, 1);
 
 	if (cmd_string_parse(template, &cmdlist, &cause) != 0) {

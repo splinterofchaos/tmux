@@ -51,7 +51,6 @@ cmd_choose_client_exec(struct cmd *self, struct cmd_ctx *ctx)
 {
 	struct args			*args = self->args;
 	struct window_choose_data	*cdata;
-	struct format_tree		*ft;
 	struct winlink			*wl;
 	struct client			*c;
 	const char			*template;
@@ -80,28 +79,20 @@ cmd_choose_client_exec(struct cmd *self, struct cmd_ctx *ctx)
 			cur = idx;
 		idx++;
 
-		ft = format_create();
-
-		cdata = xmalloc(sizeof *cdata);
+		cdata = window_choose_data_create(ctx);
 		if (args->argc != 0)
 			cdata->action = xstrdup(args->argv[0]);
 		else
 			cdata->action = xstrdup("detach-client -t '%%'");
-		cdata->client = ctx->curclient;
 		cdata->idx = i;
-		cdata->ft_template = xstrdup(template);
-		cdata->ft = ft;
 
-		format_add(ft, "line", "%u", i);
-		format_session(ft, c->session);
-		format_client(ft, c);
+		cdata->ft_template = xstrdup(template);
+		format_add(cdata->ft, "line", "%u", i);
+		format_session(cdata->ft, c->session);
+		format_client(cdata->ft, c);
 
 		window_choose_add(wl->window->active, cdata);
-
-		format_free(ft);
 	}
-
-	cdata->client->references++;
 
 	window_choose_ready(wl->window->active,
 	    cur, cmd_choose_client_callback, cmd_choose_client_free);
@@ -141,8 +132,8 @@ cmd_choose_client_free(void *data)
 	cdata->client->references--;
 
 	/* TA:  FIXME - move this to window_choose_free() or somesuch. */
-	xfree((char *)cdata->ft_template);
+	xfree(cdata->ft_template);
 	xfree(cdata->action);
-	xfree(cdata->raw_format);
+	format_free(cdata->ft);
 	xfree(cdata);
 }

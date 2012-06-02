@@ -72,25 +72,20 @@ cmd_choose_window_exec(struct cmd *self, struct cmd_ctx *ctx)
 			cur = idx;
 		idx++;
 
-		cdata = xmalloc(sizeof *cdata);
+		cdata = window_choose_data_create(ctx);
 		if (args->argc != 0)
 			cdata->action = xstrdup(args->argv[0]);
 		else
 			cdata->action = xstrdup("select-window -t '%%'");
-		cdata->session = s;
-		cdata->client = ctx->curclient;
-		cdata->idx = idx;
 
-		cdata->ft = format_create();
+		cdata->idx = wm->idx;
+		cdata->ft_template = xstrdup(template);
 		format_add(cdata->ft, "line", "%u", idx);
 		format_session(cdata->ft, s);
 		format_winlink(cdata->ft, s, wm);
 
 		window_choose_add(wl->window->active, cdata);
 	}
-
-	cdata->session->references++;
-	cdata->client->references++;
 
 	window_choose_ready(wl->window->active,
 	    cur, cmd_choose_window_callback, cmd_choose_window_free);
@@ -105,12 +100,21 @@ cmd_choose_window_callback(void *data)
 	struct session			*s = cdata->session;
 	u_int				 idx;
 
-	if (cdata == NULL)
+	log_debug("Calling choose_window_callback...");
+	if (cdata == NULL) {
+		log_debug("CALLBACK NOT RUNNING.  NULL cdata");
 		return;
-	if (!session_alive(s))
+	}
+	if (!session_alive(s)) {
+		log_debug("CALLBACK NOT RUNNING.  DEAD SESSION?  %d",
+				s->idx);
 		return;
-	if (cdata->client->flags & CLIENT_DEAD)
+	}
+	if (cdata->client->flags & CLIENT_DEAD) {
+		log_debug("CALLBACK NOT RUNNING.  CLIENT DEAD.");
 		return;
+	}
+	log_debug("Still here.");
 
 	idx = cdata->idx;
 
@@ -127,9 +131,8 @@ cmd_choose_window_free(void *data)
 	cdata->client->references--;
 
 	/* TA:  FIXME - move this to window_choose_free() or somesuch. */
-	xfree((char *)cdata->ft_template);
+	xfree(cdata->ft_template);
 	xfree(cdata->action);
-	xfree(cdata->raw_format);
 	format_free(cdata->ft);
 	xfree(cdata);
 }

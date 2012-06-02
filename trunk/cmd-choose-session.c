@@ -48,7 +48,6 @@ cmd_choose_session_exec(struct cmd *self, struct cmd_ctx *ctx)
 	struct window_choose_data	*cdata;
 	struct winlink			*wl;
 	struct session			*s;
-	struct format_tree		*ft;
 	const char			*template;
 	u_int			 	 idx, cur;
 
@@ -72,26 +71,19 @@ cmd_choose_session_exec(struct cmd *self, struct cmd_ctx *ctx)
 			cur = idx;
 		idx++;
 
-		ft = format_create();
-
-		cdata = xmalloc(sizeof *cdata);
+		cdata = window_choose_data_create(ctx);
 		if (args->argc != 0)
 			cdata->action = xstrdup(args->argv[0]);
 		else
 			cdata->action = xstrdup("switch-client -t '%%'");
-		cdata->client = ctx->curclient;
-		cdata->idx = idx;
-		cdata->ft = ft;
+		cdata->idx = s->idx;
 
-		format_add(ft, "line", "%u", idx);
-		format_session(ft, s);
+		cdata->ft_template = xstrdup(template);
+		format_add(cdata->ft, "line", "%u", idx);
+		format_session(cdata->ft, s);
 
 		window_choose_add(wl->window->active, cdata);
-
-		format_free(ft);
 	}
-
-	cdata->client->references++;
 
 	window_choose_ready(wl->window->active,
 	    cur, cmd_choose_session_callback, cmd_choose_session_free);
@@ -125,10 +117,11 @@ cmd_choose_session_free(void *data)
 	struct window_choose_data	*cdata = data;
 
 	cdata->client->references--;
+	cdata->session->references--;
 
 	/* TA:  FIXME - move this to window_choose_free() or somesuch. */
-	xfree((char *)cdata->ft_template);
+	xfree(cdata->ft_template);
 	xfree(cdata->action);
-	xfree(cdata->raw_format);
+	format_free(cdata->ft);
 	xfree(cdata);
 }

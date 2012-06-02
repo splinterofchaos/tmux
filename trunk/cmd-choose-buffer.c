@@ -48,7 +48,6 @@ cmd_choose_buffer_exec(struct cmd *self, struct cmd_ctx *ctx)
 	struct window_choose_data	*cdata;
 	struct winlink			*wl;
 	struct paste_buffer		*pb;
-	struct format_tree		*ft;
 	u_int				 idx;
 	const char			*template;
 
@@ -71,27 +70,20 @@ cmd_choose_buffer_exec(struct cmd *self, struct cmd_ctx *ctx)
 
 	idx = 0;
 	while ((pb = paste_walk_stack(&global_buffers, &idx)) != NULL) {
-		ft = format_create();
-		cdata = xmalloc(sizeof *cdata);
+		cdata = window_choose_data_create(ctx);
 		if (args->argc != 0)
 			cdata->action = xstrdup(args->argv[0]);
 		else
 			cdata->action = xstrdup("paste-buffer -b '%%'");
 
-		cdata->ft_template = xstrdup(template);
 		cdata->idx = idx - 1;
-		cdata->ft = ft;
-		cdata->client = ctx->curclient;
 
-		format_add(ft, "line", "%u", idx - 1);
-		format_paste_buffer(ft, pb);
+		cdata->ft_template = xstrdup(template);
+		format_add(cdata->ft, "line", "%u", idx - 1);
+		format_paste_buffer(cdata->ft, pb);
 
 		window_choose_add(wl->window->active, cdata);
-
-		format_free(ft);
 	}
-
-	cdata->client->references++;
 
 	window_choose_ready(wl->window->active,
 	    0, cmd_choose_buffer_callback, cmd_choose_buffer_free);
@@ -124,6 +116,6 @@ cmd_choose_buffer_free(void *data)
 	/* TA:  FIXME - move this to window_choose_free() or somesuch. */
 	xfree((char *)cdata->ft_template);
 	xfree(cdata->action);
-	xfree(cdata->raw_format);
+	format_free(cdata->ft);
 	xfree(cdata);
 }

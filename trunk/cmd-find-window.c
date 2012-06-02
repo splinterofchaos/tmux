@@ -82,7 +82,6 @@ cmd_find_window_exec(struct cmd *self, struct cmd_ctx *ctx)
 	struct session			*s;
 	struct winlink			*wl, *wm;
 	struct window_pane		*wp;
-	struct format_tree		*ft;
 	ARRAY_DECL(, u_int)	 	 list_idx;
 	ARRAY_DECL(, char *)	 	 list_ctx;
 	char				*str, *sres, *sctx, *searchstr;
@@ -168,27 +167,18 @@ cmd_find_window_exec(struct cmd *self, struct cmd_ctx *ctx)
 		wm = winlink_find_by_index(
 		    &s->windows, ARRAY_ITEM(&list_idx, i));
 
-		ft = format_create();
-		cdata = xmalloc(sizeof *cdata);
-		cdata->session = s;
-		cdata->action = NULL;
-		cdata->ft_template = xstrdup(template);
-		cdata->session = s;
-		cdata->client = NULL;
+		cdata = window_choose_data_create(ctx);
 		cdata->idx = wm->idx;
 
-		format_add(ft, "line", "%u", i);
-		format_add(ft, "window_find_matches", "%s",
+		cdata->ft_template = xstrdup(template);
+		format_add(cdata->ft, "line", "%u", i);
+		format_add(cdata->ft, "window_find_matches", "%s",
 			ARRAY_ITEM(&list_ctx, i));
-		format_session(ft, s);
-		format_winlink(ft, s, wm);
+		format_session(cdata->ft, s);
+		format_winlink(cdata->ft, s, wm);
 
 		window_choose_add(wl->window->active, cdata);
-
-		format_free(ft);
 	}
-
-	cdata->session->references++;
 
 	window_choose_ready(wl->window->active,
 	    0, cmd_find_window_callback, cmd_find_window_free);
@@ -228,8 +218,7 @@ cmd_find_window_free(void *data)
 	cdata->session->references--;
 
 	/* TA:  FIXME - move this to window_choose_free() or somesuch. */
-	xfree((char *)cdata->ft_template);
-	xfree(cdata->action);
-	xfree(cdata->raw_format);
+	xfree(cdata->ft_template);
+	format_free(cdata->ft);
 	xfree(cdata);
 }
