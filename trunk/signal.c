@@ -29,6 +29,27 @@ struct event	ev_sigterm;
 struct event	ev_sigusr1;
 struct event	ev_sigwinch;
 
+void		clear_signal(struct sigaction*, int signum);
+void		set_add_signal(struct event *, void(*)(int, short, void *), int);
+
+/* Clear signal. */
+void 
+clear_signal(struct sigaction* sigact, int signum)
+{
+	if (sigaction(signum, &sigact, NULL) != 0)
+		fatal("sigaction failed");
+}
+
+/* Set and add signal. */
+void 
+set_add_signal(struct event *ev, void(*handler)(int, short, unused void *), 
+                    int signum)
+{
+	signal_set(ev, signum, handler, NULL);
+	signal_add(ev, NULL);
+}
+
+
 void
 set_signals(void(*handler)(int, short, unused void *))
 {
@@ -38,27 +59,18 @@ set_signals(void(*handler)(int, short, unused void *))
 	sigemptyset(&sigact.sa_mask);
 	sigact.sa_flags = SA_RESTART;
 	sigact.sa_handler = SIG_IGN;
-	if (sigaction(SIGINT, &sigact, NULL) != 0)
-		fatal("sigaction failed");
-	if (sigaction(SIGPIPE, &sigact, NULL) != 0)
-		fatal("sigaction failed");
-	if (sigaction(SIGUSR2, &sigact, NULL) != 0)
-		fatal("sigaction failed");
-	if (sigaction(SIGTSTP, &sigact, NULL) != 0)
-		fatal("sigaction failed");
+	clear_signal(&sigact, SIGINT);
+	clear_signal(&sigact, SIGPIPE);
+	clear_signal(&sigact, SIGUSR2);
+	clear_signal(&sigact, SIGTSTP);
 
-	signal_set(&ev_sighup, SIGHUP, handler, NULL);
-	signal_add(&ev_sighup, NULL);
-	signal_set(&ev_sigchld, SIGCHLD, handler, NULL);
-	signal_add(&ev_sigchld, NULL);
-	signal_set(&ev_sigcont, SIGCONT, handler, NULL);
-	signal_add(&ev_sigcont, NULL);
-	signal_set(&ev_sigterm, SIGTERM, handler, NULL);
-	signal_add(&ev_sigterm, NULL);
-	signal_set(&ev_sigusr1, SIGUSR1, handler, NULL);
-	signal_add(&ev_sigusr1, NULL);
-	signal_set(&ev_sigwinch, SIGWINCH, handler, NULL);
-	signal_add(&ev_sigwinch, NULL);
+
+	set_add_signal(&ev_sighup, handler, SIGHUP);
+	set_add_signal(&ev_sigchld, handler, SIGCHLD);
+	set_add_signal(&ev_sigcont, handler, SIGCONT);
+	set_add_signal(&ev_sigterm, handler, SIGTERM);
+	set_add_signal(&ev_sigusr1, handler, SIGUSR1);
+	set_add_signal(&ev_sigwinch, handler, SIGWINCH);
 }
 
 void
