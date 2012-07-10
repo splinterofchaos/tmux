@@ -458,6 +458,7 @@ client_stdin_callback(unused int fd, unused short events, unused void *data1)
 		return;
 
 	client_write_server(MSG_STDIN, &data, sizeof data);
+    /* event_add was called with EV_PERSIST. Does that mean this event repeats until del()? */
 	if (data.size <= 0)
 		event_del(&client_stdin);
 	client_update_event();

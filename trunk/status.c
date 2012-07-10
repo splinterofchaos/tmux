@@ -496,7 +496,18 @@ out:
 	return;
 
 skip_to:
-	*(*optr)++ = '#';
+	/* Don't replace anything; just copy and return. */
+	*(*optr)++ = '#'; 
+
+	/*
+	 * Since this is called by status_replace, which ignores everything
+	 * except the #, couldn't we return here?
+	 *
+	 * A string like #[fg=...,#(foo)] might cause satus_replace to call
+	 * this on foo where it'd normally get skipped. Would that be a bad
+	 * thing? Might it cause a problem down the line? Does this code
+	 * intentionally prevent that?
+	 */
 
 	(*iptr)--;	/* include ch */
 	while (**iptr != ch && **iptr != '\0') {
@@ -521,6 +532,7 @@ status_replace(struct client *c, struct session *s, struct winlink *wl,
 	iptr = in;
 	optr = out;
 
+	/* Search for # and do replace. */
 	while (*iptr != '\0') {
 		if (optr >= out + (sizeof out) - 1)
 			break;
